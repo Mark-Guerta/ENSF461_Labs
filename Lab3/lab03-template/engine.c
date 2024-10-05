@@ -97,21 +97,20 @@ int main(int argc, char *argv[])
         // TODO
 
         // Run commands
+        fork();
         // * Fork and execute commands
-        // * Handle pipes
+        // * Handle PATH
         // * Handle redirections
-        if (strcmp(tokens[2]->value,">") != 0) {
-            if (dup2(readlen, STDIN_FILENO) == -1) {
-                perror("Error redirecting input");
-                return -4;
-        }
-            printf( "%s",tokens[0]->value);
-        }
-
         // * Handle pipes
         // * Handle variable assignments
         // TODO
-
+        char* command = tokens[0]->value;
+        char* args[numtokens];
+        for (int ii = 0; ii < numtokens; ii++) {
+            args[ii] = tokens[ii]->value;
+        }
+        char* envp[] = {NULL};
+        execve(command, args, envp);
         // Free tokens vector
         for (int ii = 0; ii < numtokens; ii++) {
             free(tokens[ii]->value);
