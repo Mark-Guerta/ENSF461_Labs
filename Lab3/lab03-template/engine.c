@@ -35,8 +35,39 @@ int read_line(int infile, char *buffer, int maxlen)
 
 
 int normalize_executable(char **command) {
-    // Convert command to absolute path if needed (e.g., "ls" -> "/bin/ls")
-    // Returns TRUE if command was found, FALSE otherwise
+    if (command == NULL || *command == NULL) {
+        return FALSE;
+    }
+
+    if ((*command)[0] == '/') {
+        return TRUE;
+    }
+
+    if (strchr(*command, '/') != NULL) {
+        return TRUE;
+    }
+
+    char *path = getenv("PATH");
+    if (path == NULL) {
+        return FALSE;
+    }
+
+    char *path_copy = strdup(path); 
+    char *token = strtok(path_copy, ":");
+    while (token != NULL) {
+        char fullpath[1024];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", token, *command);
+
+        if (access(fullpath, X_OK) == 0) {
+            *command = strdup(fullpath);
+            free(path_copy);
+            return TRUE;
+        }
+
+        token = strtok(NULL, ":");
+    }
+
+    free(path_copy);
     return FALSE;
 }
 
@@ -96,6 +127,18 @@ int main(int argc, char *argv[])
         // * Check if pipes are present
         // TODO
 
+        char* command = tokens[0]->value;
+        char* args[numtokens + 1];
+        for (int i = 0; i < numtokens; i++) {
+            args[i] = tokens[i]->value;
+        }
+        args[numtokens] = NULL;
+
+        // Normalize the executable path
+        if (!normalize_executable(&command)) {
+            fprintf(stderr, "Command not found: %s\n", command);
+            continue;
+        }
         // Run commands
         pid_t pid = fork();
         // * Fork and execute commands
@@ -106,26 +149,17 @@ int main(int argc, char *argv[])
         // TODO
         // Fork and execute commands base template
         if (pid == 0) {
-            char* command; // Command path to run
-            char* args;    // Arguments to pass to command
-            char* envp[] = {NULL};  // Environment variables for command
-            if (tokens[2]->type == TOKEN_REDIR){
-                int fd = open(tokens[3]->value, O_WRONLY);
-                if(fd < 0) {
-                    perror("Error opening output file");
-                    exit(EXIT_FAILURE);
-                }
-                if (dup2(fd, STDOUT_FILENO) < 0){
-                    perror("Error duplicating file descriptor");
-                    exit(EXIT_FAILURE);
-                }
-                close(fd);
-                command = tokens[0]->value;
-                args = tokens[1]->value;
-            }
-
-            execve(command, args, envp);
-            prerror("Error executing command");
+            // Child process
+            execve(command, args, NULL);
+            perror("Error executing command");
+            exit(EXIT_FAILURE);
+        } else if (pid > 0) {
+            // Parent process
+            int status;
+            waitpid(pid, &status, 0);
+        } else {
+            perror("Error forking");
+            return -4;
         }
         // Free tokens vector
         for (int ii = 0; ii < numtokens; ii++) {
