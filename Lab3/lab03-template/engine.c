@@ -97,20 +97,27 @@ int main(int argc, char *argv[])
         // TODO
 
         // Run commands
-        fork();
+        pid_t pid = fork();
         // * Fork and execute commands
         // * Handle PATH
         // * Handle redirections
         // * Handle pipes
         // * Handle variable assignments
         // TODO
-        char* command = tokens[0]->value;
-        char* args[numtokens];
-        for (int ii = 0; ii < numtokens; ii++) {
-            args[ii] = tokens[ii]->value;
+        // Fork and execute commands base template
+        if (pid == 0) {
+            char* command; // Command path to run
+            char* args;    // Arguments to pass to command
+            char* envp[] = {NULL};  // Environment variables for command
+            if (tokens[2]->type == TOKEN_REDIR){
+                int fd = open(tokens[3]->value, O_WRONLY);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+                command = tokens[0]->value;
+                args = tokens[1]->value;
+            }
+            execve(command, args, envp);
         }
-        char* envp[] = {NULL};
-        execve(command, args, envp);
         // Free tokens vector
         for (int ii = 0; ii < numtokens; ii++) {
             free(tokens[ii]->value);
