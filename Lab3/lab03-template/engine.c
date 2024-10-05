@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
             // Check for redirection
             for (int i = 0; i < numtokens; i++) {
                 if (tokens[i]->type == TOKEN_REDIR) {
-                    int fd = open(tokens[i + 1]->value, O_WRONLY | O_CREAT | O_TRUNC);
+                    int fd = open(tokens[i + 1]->value, O_WRONLY | O_CREAT | O_TRUNC, 0644);
                     if (fd < 0) {
                         perror("Error opening output file");
                         exit(EXIT_FAILURE);
