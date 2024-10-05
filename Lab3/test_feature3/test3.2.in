@@ -1,5 +1,0 @@
-echo "Hello, world" > hello.txt
-echo "Hello, cat" > hello.txt
-grep world hello.txt
-grep cat hello.txt
-rm hello.txt

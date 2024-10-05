@@ -1,3 +1,0 @@
-echo mountain | rev > myfile.txt
-cat myfile.txt
-rm myfile.txt

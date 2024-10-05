@@ -1,2 +1,0 @@
-var = echo -n hello
-echo $var
