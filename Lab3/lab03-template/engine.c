@@ -111,12 +111,21 @@ int main(int argc, char *argv[])
             char* envp[] = {NULL};  // Environment variables for command
             if (tokens[2]->type == TOKEN_REDIR){
                 int fd = open(tokens[3]->value, O_WRONLY);
-                dup2(fd, STDOUT_FILENO);
+                if(fd < 0) {
+                    perror("Error opening output file");
+                    exit(EXIT_FAILURE);
+                }
+                if (dup2(fd, STDOUT_FILENO) < 0){
+                    perror("Error duplicating file descriptor");
+                    exit(EXIT_FAILURE);
+                }
                 close(fd);
                 command = tokens[0]->value;
                 args = tokens[1]->value;
             }
+
             execve(command, args, envp);
+            prerror("Error executing command");
         }
         // Free tokens vector
         for (int ii = 0; ii < numtokens; ii++) {
