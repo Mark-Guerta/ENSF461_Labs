@@ -150,9 +150,31 @@ int main(int argc, char *argv[])
         // Fork and execute commands base template
         if (pid == 0) {
             // Child process
-            execve(command, args, NULL);
-            perror("Error executing command");
-            exit(EXIT_FAILURE);
+            char* envp[] = {NULL};  // Environment variables for command
+
+            // Check for redirection
+            for (int i = 0; i < numtokens; i++) {
+                if (tokens[i]->type == TOKEN_REDIR) {
+                    int fd = open(tokens[i + 1]->value, O_WRONLY | O_CREAT | O_TRUNC);
+                    if (fd < 0) {
+                        perror("Error opening output file");
+                        exit(EXIT_FAILURE);
+                    }
+                    if (dup2(fd, STDOUT_FILENO) < 0) {
+                        perror("Error duplicating file descriptor");
+                        exit(EXIT_FAILURE);
+                    }
+                    close(fd);
+                    // Remove redirection tokens from args
+                    tokens[i] = NULL;
+                    tokens[i + 1] = NULL;
+                    break;
+                }
+            }
+
+        execve(command, args, envp);
+        perror("Error executing command");
+        exit(EXIT_FAILURE);
         } else if (pid > 0) {
             // Parent process
             int status;
