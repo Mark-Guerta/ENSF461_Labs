@@ -17,40 +17,49 @@ struct job {
     int arrival; // arrival time; safely assume the time unit has the minimal increment of 1
     int length;
     int tickets; // number of tickets for lottery scheduling
-    // TODO: add any other metadata you need to track here
+    int remaining_time; // remaining time for STCF and RR
+    int start_time; // time when the job first starts execution
+    int end_time; // time when the job finishes execution
     struct job *next;
 };
 
 // the workload list
 struct job *head = NULL;
 
-
-void append_to(struct job **head_pointer, int arrival, int length, int tickets){
-
-    // TODO: create a new job and init it with proper data
-    struct job *new_job = (struct job*)malloc(sizeof(struct job));
-    if (new_job == NULL){
-        fprintf(stderr, "Failed to allocate memory");
+void append_to(struct job **head_pointer, int arrival, int length, int tickets) {
+    // Allocate memory for the new job
+    struct job *new_job = (struct job *)malloc(sizeof(struct job));
+    if (new_job == NULL) {
+        fprintf(stderr, "Failed to allocate memory\n");
+        return;
     }
 
-    struct job *tail = *head_pointer;
-    
+    // Initialize the new job with the provided data
     new_job->arrival = arrival;
     new_job->length = length;
     new_job->tickets = tickets;
+    new_job->remaining_time = length;
+    new_job->start_time = -1; // Initialize start time to -1 (not started)
+    new_job->end_time = -1; // Initialize end time to -1 (not finished)
     new_job->next = NULL;
 
-    while(tail->next){
-        tail = tail->next;
+    // If the list is empty, set the new job as the head
+    if (*head_pointer == NULL) {
+        new_job->id = 1; // Initialize the first job ID to 1
+        *head_pointer = new_job;
+    } else {
+        // Traverse to the end of the list and append the new job
+        struct job *tail = *head_pointer;
+        while (tail->next != NULL) {
+            tail = tail->next;
+        }
+        new_job->id = tail->id + 1; // Increment the job ID based on the last job's ID
+        tail->next = new_job;
     }
-    new_job->id = ++(tail->id);
-    tail->next = new_job;
-    return;
+    numofjobs++;
 }
 
-
-void read_job_config(const char* filename)
-{
+void read_job_config(const char* filename) {
     FILE *fp;
     char *line = NULL;
     size_t len = 0;
@@ -61,16 +70,24 @@ void read_job_config(const char* filename)
     char *arrival = NULL;
     char *length = NULL;
 
-    // TODO, error checking
+    // Error checking
     fp = fopen(filename, "r");
-    if (fp == NULL)
+    if (fp == NULL) {
+        perror("Error opening file");
         exit(EXIT_FAILURE);
+    }
 
-    // TODO: if the file is empty, we should just exit with error
-    while ((read = getline(&line, &len, fp)) != -1)
-    {
-        if( line[read-1] == '\n' )
-            line[read-1] =0;
+    // If the file is empty, exit with error
+    if (getline(&line, &len, fp) == -1) {
+        fprintf(stderr, "Error: file is empty\n");
+        exit(EXIT_FAILURE);
+    }
+    rewind(fp);
+
+    while ((read = getline(&line, &len, fp)) != -1) {
+        if (line[read-1] == '\n') {
+            line[read-1] = 0;
+        }
         arrival = strtok(line, delim);
         length = strtok(NULL, delim);
         tickets += 100;
@@ -82,20 +99,54 @@ void read_job_config(const char* filename)
     if (line) free(line);
 }
 
-
-void policy_SJF()
-{
+void policy_SJF() {
     printf("Execution trace with SJF:\n");
 
-    // TODO: implement SJF policy
+    struct job *current, *shortest;
+    int current_time = 0;
+
+    while (numofjobs > 0) {
+        current = head;
+        shortest = NULL;
+
+        // Find the shortest job that has arrived
+        while (current != NULL) {
+            if (current->arrival <= current_time && (shortest == NULL || current->length < shortest->length || (current->length == shortest->length && current->arrival < shortest->arrival))) {
+                shortest = current;
+            }
+            current = current->next;
+        }
+
+        if (shortest != NULL) {
+            if (shortest->start_time == -1) {
+                shortest->start_time = current_time;
+            }
+            printf("[Job %d] arrived at time [%d] ran for [%d]\n", shortest->id, shortest->arrival, shortest->length);
+            current_time += shortest->length;
+            shortest->end_time = current_time;
+            numofjobs--;
+
+            // Remove the job from the list
+            if (shortest == head) {
+                head = head->next;
+            } else {
+                current = head;
+                while (current->next != shortest) {
+                    current = current->next;
+                }
+                current->next = shortest->next;
+            }
+            free(shortest);
+        } else {
+            // No job is ready to run, increment the current time
+            current_time++;
+        }
+    }
 
     printf("End of execution with SJF.\n");
-
 }
 
-
-void policy_STCF()
-{
+void policy_STCF() {
     printf("Execution trace with STCF:\n");
 
     // TODO: implement STCF policy
@@ -103,9 +154,7 @@ void policy_STCF()
     printf("End of execution with STCF.\n");
 }
 
-
-void policy_RR(int slice)
-{
+void policy_RR(int slice) {
     printf("Execution trace with RR:\n");
 
     // TODO: implement RR policy
@@ -113,9 +162,7 @@ void policy_RR(int slice)
     printf("End of execution with RR.\n");
 }
 
-
-void policy_LT(int slice)
-{
+void policy_LT(int slice) {
     printf("Execution trace with LT:\n");
 
     // Leave this here, it will ensure the scheduling behavior remains deterministic
@@ -131,11 +178,9 @@ void policy_LT(int slice)
     // And pick the winning job using the linked list approach discussed in class, or equivalent
 
     printf("End of execution with LT.\n");
-
 }
 
-
-void policy_FIFO(){
+void policy_FIFO() {
     printf("Execution trace with FIFO:\n");
 
     // TODO: implement FIFO policy
@@ -143,9 +188,7 @@ void policy_FIFO(){
     printf("End of execution with FIFO.\n");
 }
 
-
-int main(int argc, char **argv){
-
+int main(int argc, char **argv) {
     static char usage[] = "usage: %s analysis policy slice trace\n";
 
     int analysis;
@@ -153,21 +196,19 @@ int main(int argc, char **argv){
     char *tname;
     int slice;
 
-
-    if (argc < 5)
-    {
+    if (argc < 5) {
         fprintf(stderr, "missing variables\n");
         fprintf(stderr, usage, argv[0]);
-		exit(1);
+        exit(1);
     }
 
-    // if 0, we don't analysis the performance
+    // if 0, we don't analyze the performance
     analysis = atoi(argv[1]);
 
     // policy name
     pname = argv[2];
 
-    // time slice, only valid for RR
+    // time slice, only valid for RR and LT
     slice = atoi(argv[3]);
 
     // workload trace
@@ -175,28 +216,36 @@ int main(int argc, char **argv){
 
     read_job_config(tname);
 
-    if (strcmp(pname, "FIFO") == 0){
+    if (strcmp(pname, "FIFO") == 0) {
         policy_FIFO();
-        if (analysis == 1){
+        if (analysis == 1) {
             // TODO: perform analysis
         }
-    }
-    else if (strcmp(pname, "SJF") == 0)
-    {
-        // TODO
-    }
-    else if (strcmp(pname, "STCF") == 0)
-    {
-        // TODO
-    }
-    else if (strcmp(pname, "RR") == 0)
-    {
-        // TODO
-    }
-    else if (strcmp(pname, "LT") == 0)
-    {
-        // TODO
+    } else if (strcmp(pname, "SJF") == 0) {
+        policy_SJF();
+        if (analysis == 1) {
+            // TODO: perform analysis
+        }
+    } else if (strcmp(pname, "STCF") == 0) {
+        policy_STCF();
+        if (analysis == 1) {
+            // TODO: perform analysis
+        }
+    } else if (strcmp(pname, "RR") == 0) {
+        policy_RR(slice);
+        if (analysis == 1) {
+            // TODO: perform analysis
+        }
+    } else if (strcmp(pname, "LT") == 0) {
+        policy_LT(slice);
+        if (analysis == 1) {
+            // TODO: perform analysis
+        }
+    } else {
+        fprintf(stderr, "Unknown policy: %s\n", pname);
+        fprintf(stderr, usage, argv[0]);
+        exit(1);
     }
 
-	exit(0);
+    exit(0);
 }
