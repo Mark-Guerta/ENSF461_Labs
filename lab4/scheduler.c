@@ -28,6 +28,23 @@ struct job *head = NULL;
 void append_to(struct job **head_pointer, int arrival, int length, int tickets){
 
     // TODO: create a new job and init it with proper data
+    struct job *new_job = (struct job*)malloc(sizeof(struct job));
+    if (new_job == NULL){
+        fprintf(stderr, "Failed to allocate memory");
+    }
+
+    struct job *tail = *head_pointer;
+    
+    new_job->arrival = arrival;
+    new_job->length = length;
+    new_job->tickets = tickets;
+    new_job->next = NULL;
+
+    while(tail->next){
+        tail = tail->next;
+    }
+    new_job->id = ++(tail->id);
+    tail->next = new_job;
     return;
 }
 
