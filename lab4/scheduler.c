@@ -192,6 +192,9 @@ void policy_FIFO(){
     int total = 0;
     
     while(temp){
+        if(temp->arrival > 0 && temp->id - 1 == 0){
+            total = temp->arrival;
+        }
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", total, temp->id - 1, temp->arrival, temp->length);
         total = temp->length + total;
         if(temp->next){
@@ -251,10 +254,13 @@ int main(int argc, char **argv) {
                 double avgWait = 0;
 
                 while(temp){
+                    if(temp->arrival > 0 && temp->id - 1 == 0){
+                        total = temp->arrival;
+                    }
                     printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, total - temp->arrival, temp->length + total - temp->arrival, total - temp->arrival);
                     avgResponse = avgResponse + (total - temp->arrival);
                     avgTurnaround = avgTurnaround + (temp->length + total - temp->arrival);
-                    avgWait = avgWait + total;
+                    avgWait = avgWait + (total - temp->arrival);
                     total = total + temp->length;
                     if(temp->next){
                         if(temp->next->arrival > total){
