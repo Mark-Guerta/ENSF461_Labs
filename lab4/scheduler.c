@@ -180,12 +180,30 @@ void policy_LT(int slice) {
     printf("End of execution with LT.\n");
 }
 
-void policy_FIFO() {
+void policy_FIFO(){
     printf("Execution trace with FIFO:\n");
 
-    // TODO: implement FIFO policy
+    struct job* temp = head;
+    if(temp == NULL){
+        fprintf(stderr, "Failed to copy head pointer");
+        exit(1);
+    }
 
+    int total = 0;
+    
+    while(temp){
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", total, temp->id - 1, temp->arrival, temp->length);
+        total = temp->length + total;
+        if(temp->next){
+            if(temp->next->arrival > total){
+                total = temp->next->arrival;
+            }
+        }
+        temp = temp->next;
+    }
     printf("End of execution with FIFO.\n");
+
+    return;
 }
 
 int main(int argc, char **argv) {
@@ -218,8 +236,41 @@ int main(int argc, char **argv) {
 
     if (strcmp(pname, "FIFO") == 0) {
         policy_FIFO();
-        if (analysis == 1) {
-            // TODO: perform analysis
+        if (analysis == 1){
+            printf("Begin analyzing FIFO:\n");
+            {
+                struct job* temp = head;
+                if(temp == NULL){
+                    fprintf(stderr, "Failed to copy head pointer");
+                    exit(1);
+                }
+                int i = 0;
+                int total = 0;
+                double avgResponse = 0;
+                double avgTurnaround = 0;
+                double avgWait = 0;
+
+                while(temp){
+                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, total - temp->arrival, temp->length + total - temp->arrival, total - temp->arrival);
+                    avgResponse = avgResponse + (total - temp->arrival);
+                    avgTurnaround = avgTurnaround + (temp->length + total - temp->arrival);
+                    avgWait = avgWait + total;
+                    total = total + temp->length;
+                    if(temp->next){
+                        if(temp->next->arrival > total){
+                            total = temp->next->arrival;
+                        }
+                    }
+                    temp = temp->next;
+                    i++;
+                }
+
+                avgResponse = avgResponse / i;
+                avgTurnaround = avgTurnaround / i;
+                avgWait = avgWait / i;
+                printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", avgResponse, avgTurnaround, avgWait);
+            }
+            printf("End analyzing FIFO.\n");
         }
     } else if (strcmp(pname, "SJF") == 0) {
         policy_SJF();
