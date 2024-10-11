@@ -172,10 +172,44 @@ void policy_LT(int slice) {
     // Figure out which active job to run first
     // Pick the job with the shortest remaining time
     // Considers jobs in order of arrival, so implicitly breaks ties by choosing the job with the lowest ID
+    struct job* temp = head;
+    int total_tickets = 0;
+    while(temp){
+        total_tickets = total_tickets + temp->tickets;
+        temp = temp->next;
+    }
+    int winning_ticket = rand() % total_tickets;
 
-    // To achieve consistency with the tests, you are encouraged to choose the winning ticket as follows:
-    // int winning_ticket = rand() % total_tickets;
-    // And pick the winning job using the linked list approach discussed in class, or equivalent
+    temp = head;
+    int time_taken = 0;
+    int jobs_remaining = numofjobs;
+
+
+    while(jobs_remaining){
+        int tickets_passed = 0;
+
+        
+        while(1){ //WIP
+            tickets_passed = tickets_passed + temp->tickets;
+            if(tickets_passed >= winning_ticket){
+                break;
+            }
+            temp = temp->next;
+
+        }
+
+        winning_ticket = rand() % total_tickets;
+
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time_taken, temp->id - 1, temp->arrival, slice);
+
+        time_taken += slice;
+        temp->remaining_time -= slice;
+
+        if(temp->remaining_time == 0){
+            jobs_remaining -= 1;
+        }
+    }
+
 
     printf("End of execution with LT.\n");
 }
