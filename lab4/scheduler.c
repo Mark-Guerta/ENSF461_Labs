@@ -23,6 +23,53 @@ struct job {
     struct job *next;
 };
 
+struct jobs{
+    struct job* jb;
+    struct jobs* next;
+};
+
+struct jobs* llhead = NULL;
+
+void addNode(struct jobs* jobs, struct job* job ){
+    while(1){
+        if(jobs->next == NULL){ 
+            jobs->next = (struct jobs*)malloc(sizeof(jobs));
+            jobs->next->next = NULL;
+            jobs->next->jb = job;
+            break;
+        }
+        jobs = jobs->next;
+    }
+};
+
+void removeNode(struct jobs* jobs, struct job* job){
+    struct jobs* prev = NULL;
+    while(jobs != NULL){
+        if(jobs->jb->id == job->id){
+            if(jobs->next == NULL){ //End Node
+                if(prev != NULL){//Not Last Node
+                    prev->next = NULL;
+                }
+                else{ //Very Last Node
+                    llhead = NULL;
+                }
+                free(jobs);
+            }
+            else if(prev == NULL){ //First Node
+                llhead = llhead->next;
+                free(jobs);
+            }
+            else{ //Middle node
+                prev->next = jobs->next;
+                free(jobs);
+            }
+            break;
+        }
+        prev = jobs;
+        jobs = jobs->next;
+    }
+};
+
 // the workload list
 struct job *head = NULL;
 
@@ -172,41 +219,66 @@ void policy_LT(int slice) {
     // Figure out which active job to run first
     // Pick the job with the shortest remaining time
     // Considers jobs in order of arrival, so implicitly breaks ties by choosing the job with the lowest ID
+
     struct job* temp = head;
     int total_tickets = 0;
+
+    llhead = (struct jobs*)malloc(sizeof(struct jobs));
+    llhead->jb = temp;
+    llhead->next = NULL;
+    struct jobs* lljPointer = llhead;
+
+    temp = temp->next;
+
     while(temp){
         total_tickets = total_tickets + temp->tickets;
+        addNode(lljPointer, temp);
+        lljPointer = llhead;
         temp = temp->next;
     }
+
     int winning_ticket = rand() % total_tickets;
 
-    temp = head;
     int time_taken = 0;
     int jobs_remaining = numofjobs;
 
-
     while(jobs_remaining){
         int tickets_passed = 0;
+        lljPointer = llhead;
 
-        
-        while(1){ //WIP
-            tickets_passed = tickets_passed + temp->tickets;
+        while(lljPointer != NULL){ 
+            tickets_passed = tickets_passed + lljPointer->jb->tickets;
             if(tickets_passed >= winning_ticket){
                 break;
             }
-            temp = temp->next;
-
+            lljPointer = lljPointer->next;
         }
 
         winning_ticket = rand() % total_tickets;
 
-        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time_taken, temp->id - 1, temp->arrival, slice);
+        if(lljPointer == NULL){
+            continue;
+        }
+
+        lljPointer->jb->remaining_time -= slice;
+        if(lljPointer->jb->remaining_time <= 0 && jobs_remaining == 1){
+            break;
+        }
+
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time_taken, lljPointer->jb->id - 1, lljPointer->jb->arrival, slice);
 
         time_taken += slice;
-        temp->remaining_time -= slice;
 
-        if(temp->remaining_time == 0){
+        if(lljPointer->jb->remaining_time <= 0){
             jobs_remaining -= 1;
+            temp = lljPointer->jb;
+            lljPointer = llhead;
+
+            removeNode(lljPointer, temp);
+
+            if(jobs_remaining == 0){
+                break;
+            }
         }
     }
 
