@@ -149,26 +149,32 @@ void policy_SJF() {
 void policy_STCF() {
     printf("Execution trace with STCF:\n");
     // Requirements: When a job arrives, it is added to the queue. The job with the shortest remaining time is selected to run next.
-    struct job *current;
-    struct job *search;
-    current = search = head;
+    struct job *current = NULL;
+    struct job *search = head;
     int currentTime = 0;
-    while(numofjobs){
+    while(numofjobs > 0){
         while(search != NULL){
-            if (search->arrival <= currentTime && search->remaining_time < current->remaining_time && search->remaining_time > 0){
+            if (search->arrival <= currentTime && search->arrival > 0 && current == NULL){
+                current = search;
+                current->start_time = currentTime;
+            }
+            else if(search->arrival <= currentTime && search->arrival > 0 && search->remaining_time < current->remaining_time){
                 current = search;
                 current->start_time = currentTime;
             }
             search = search->next;
         }
-        if (current->remaining_time > 0)
+        if (current == NULL)
+            continue;
+        else if (current->remaining_time > 0 && current->arrival <= currentTime)
             current->remaining_time--;
         else if (current->remaining_time == 0){
-            current->remaining_time = -1;
+            current->remaining_time = 0;
             current->end_time = currentTime;
             numofjobs--;
             current->length = current->end_time - current->start_time;
             printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", currentTime, current->id - 1, current->arrival, current->length);
+            current = NULL;
         }
         search = head;
         currentTime++;
@@ -310,7 +316,43 @@ int main(int argc, char **argv) {
     } else if (strcmp(pname, "STCF") == 0) {
         policy_STCF();
         if (analysis == 1) {
-            // TODO: perform analysis
+            printf("Begin analyzing STCF:\n");
+            {
+                struct job* temp = head;
+                if(temp == NULL){
+                    fprintf(stderr, "Failed to copy head pointer");
+                    exit(1);
+                }
+                int i = 0;
+                int total = 0;
+                double avgResponse = 0;
+                double avgTurnaround = 0;
+                double avgWait = 0;
+
+                while(temp){
+                    if(temp->arrival > 0 && temp->id - 1 == 0){
+                        total = temp->arrival;
+                    }
+                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, total - temp->arrival, temp->length + total - temp->arrival, total - temp->arrival);
+                    avgResponse = avgResponse + (total - temp->arrival);
+                    avgTurnaround = avgTurnaround + (temp->length + total - temp->arrival);
+                    avgWait = avgWait + (total - temp->arrival);
+                    total = total + temp->length;
+                    if(temp->next){
+                        if(temp->next->arrival > total){
+                            total = temp->next->arrival;
+                        }
+                    }
+                    temp = temp->next;
+                    i++;
+                }
+
+                avgResponse = avgResponse / i;
+                avgTurnaround = avgTurnaround / i;
+                avgWait = avgWait / i;
+                printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", avgResponse, avgTurnaround, avgWait);
+            }
+            printf("End analyzing STCF.\n");
         }
     } else if (strcmp(pname, "RR") == 0) {
         policy_RR(slice);
