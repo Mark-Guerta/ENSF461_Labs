@@ -149,16 +149,29 @@ void policy_SJF() {
 void policy_STCF() {
     printf("Execution trace with STCF:\n");
     // Requirements: When a job arrives, it is added to the queue. The job with the shortest remaining time is selected to run next.
-    struct job *current, *shortest;
-    int current_time = 0;
-    current = head;
-    int numofjobs_before = numofjobs;
-    while(numofjobs != 0) {
-        // Check if a new job has arrived
-        if (numofjobs_before != numofjobs) {
-            current = head;
-            numofjobs_before = numofjobs;
+    struct job *current;
+    struct job *search;
+    current = search = head;
+    int currentTime = 0;
+    while(numofjobs){
+        while(search != NULL){
+            if (search->arrival <= currentTime && search->remaining_time < current->remaining_time && search->remaining_time > 0){
+                current = search;
+                current->start_time = currentTime;
+            }
+            search = search->next;
         }
+        if (current->remaining_time > 0)
+            current->remaining_time--;
+        else if (current->remaining_time == 0){
+            current->remaining_time = -1;
+            current->end_time = currentTime;
+            numofjobs--;
+            current->length = current->end_time - current->start_time;
+            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", currentTime, current->id - 1, current->arrival, current->length);
+        }
+        search = head;
+        currentTime++;
     }
     // TODO: implement STCF policy
 
