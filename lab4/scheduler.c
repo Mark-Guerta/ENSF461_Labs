@@ -197,36 +197,42 @@ void policy_STCF() {
     printf("Execution trace with STCF:\n");
     // Requirements: When a job arrives, it is added to the queue. The job with the shortest remaining time is selected to run next.
     struct job *current = NULL;
-    struct job *search = head;
-    int currentTime = 0;
-    while(numofjobs > 0){
-        while(search != NULL){
-            if (search->arrival <= currentTime && search->arrival > 0 && current == NULL){
-                current = search;
-                current->start_time = currentTime;
-            }
-            else if(search->arrival <= currentTime && search->arrival > 0 && search->remaining_time < current->remaining_time){
-                current = search;
-                current->start_time = currentTime;
+    int time = 0;
+
+    while (numofjobs) {
+        struct job *search = head; // Reset search to the head of the list for each time unit
+        struct job *shortest_job = NULL;
+
+        while (search) {
+            // Job polling (Checks when jobs arrive, time remaining is not 0, and if there are other jobs that take less time)
+            
+            if (search->arrival <= time && search->end_time == -1) {
+                if (shortest_job == NULL || search->remaining_time < shortest_job->remaining_time)
+                    shortest_job = search;
             }
             search = search->next;
         }
-        if (current == NULL)
-            continue;
-        else if (current->remaining_time > 0 && current->arrival <= currentTime)
-            current->remaining_time--;
-        else if (current->remaining_time == 0){
-            current->remaining_time = 0;
-            current->end_time = currentTime;
-            numofjobs--;
-            current->length = current->end_time - current->start_time;
-            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", currentTime, current->id - 1, current->arrival, current->length);
-            current = NULL;
+        if (current != NULL && current != shortest_job &&current->remaining_time > 0){
+            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", current->start_time, current->id - 1, current->arrival, time - current->start_time);
+            current->start_time = -1;
         }
-        search = head;
-        currentTime++;
+        current = shortest_job;
+
+        if (current != NULL && current->start_time == -1)
+            current->start_time = time;
+
+        if (current != NULL && current->remaining_time > 0) {
+            current->remaining_time--;
+        } 
+        else if (current != NULL && current->remaining_time == 0) {
+            current->end_time = time;
+            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", current->start_time, current->id - 1, current->arrival, current->end_time - current->start_time);
+            current = NULL;
+            numofjobs--;
+            continue;
+        }
+        time++;
     }
-    // TODO: implement STCF policy
 
     printf("End of execution with STCF.\n");
 }
@@ -430,25 +436,15 @@ int main(int argc, char **argv) {
                     exit(1);
                 }
                 int i = 0;
-                int total = 0;
                 double avgResponse = 0;
                 double avgTurnaround = 0;
                 double avgWait = 0;
 
                 while(temp){
-                    if(temp->arrival > 0 && temp->id - 1 == 0){
-                        total = temp->arrival;
-                    }
-                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, total - temp->arrival, temp->length + total - temp->arrival, total - temp->arrival);
-                    avgResponse = avgResponse + (total - temp->arrival);
-                    avgTurnaround = avgTurnaround + (temp->length + total - temp->arrival);
-                    avgWait = avgWait + (total - temp->arrival);
-                    total = total + temp->length;
-                    if(temp->next){
-                        if(temp->next->arrival > total){
-                            total = temp->next->arrival;
-                        }
-                    }
+                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, temp->start_time - temp->arrival, temp->end_time - temp->arrival, temp->start_time - temp->arrival);
+                    avgResponse += (temp->start_time - temp->arrival);
+                    avgTurnaround += (temp->end_time - temp->arrival);
+                    avgWait += (temp->start_time - temp->arrival);
                     temp = temp->next;
                     i++;
                 }
