@@ -442,8 +442,8 @@ int main(int argc, char **argv) {
 
                 while(temp){
                    if (temp->length > temp->end_time - temp->start_time){
-                        printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, 0, temp->end_time - temp->arrival, (temp->end_time - temp->arrival) - temp->length);
-                        avgResponse += 0;
+                        printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, temp->arrival - temp->arrival, temp->end_time - temp->arrival, (temp->end_time - temp->arrival) - temp->length);
+                        avgResponse += temp->arrival - temp->arrival; // In STCF, start time is equal to arrival time for an interrupted job
                         avgTurnaround += (temp->end_time - temp->arrival);
                         avgWait += (temp->end_time - temp->arrival) - temp->length;
                         temp = temp->next;
