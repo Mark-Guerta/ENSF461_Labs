@@ -20,6 +20,7 @@ struct job {
     int remaining_time; // remaining time for STCF and RR
     int start_time; // time when the job first starts execution
     int end_time; // time when the job finishes execution
+    int wait; //time job is spent waiting
     struct job *next;
 };
 
@@ -89,6 +90,7 @@ void append_to(struct job **head_pointer, int arrival, int length, int tickets) 
     new_job->start_time = -1; // Initialize start time to -1 (not started)
     new_job->end_time = -1; // Initialize end time to -1 (not finished)
     new_job->next = NULL;
+    new_job->wait = -1;
 
     // If the list is empty, set the new job as the head
     if (*head_pointer == NULL) {
@@ -251,13 +253,13 @@ void policy_LT(int slice) {
     // Considers jobs in order of arrival, so implicitly breaks ties by choosing the job with the lowest ID
 
     struct job* temp = head;
-    int total_tickets = 0;
 
     llhead = (struct jobs*)malloc(sizeof(struct jobs));
     llhead->jb = temp;
     llhead->next = NULL;
     struct jobs* lljPointer = llhead;
 
+    int total_tickets = temp->tickets;
     temp = temp->next;
 
     while(temp){
@@ -266,40 +268,52 @@ void policy_LT(int slice) {
         lljPointer = llhead;
         temp = temp->next;
     }
-
     int winning_ticket = rand() % total_tickets;
-
-    int time_taken = 0;
+    int time_taken =  lljPointer->jb->arrival;
     int jobs_remaining = numofjobs;
 
     while(jobs_remaining){
         int tickets_passed = 0;
+        int update_arrival_time = 0;
         lljPointer = llhead;
 
         while(lljPointer != NULL){ 
             tickets_passed = tickets_passed + lljPointer->jb->tickets;
-            if(tickets_passed >= winning_ticket){
+            if(time_taken < lljPointer->jb->arrival){
+                //Skip to next job
+                update_arrival_time++;
+                if(update_arrival_time == jobs_remaining + 1){
+                    time_taken = lljPointer->jb->arrival;
+                }
+            }
+            else if(tickets_passed >= winning_ticket){
                 break;
             }
             lljPointer = lljPointer->next;
+            if(lljPointer == NULL){
+                lljPointer = llhead;
+                winning_ticket -= tickets_passed;
+                tickets_passed = 0;
+            }
         }
 
         winning_ticket = rand() % total_tickets;
 
-        if(lljPointer == NULL){
-            continue;
-        }
-
-        lljPointer->jb->remaining_time -= slice;
-        if(lljPointer->jb->remaining_time <= 0 && jobs_remaining == 1){
-            break;
-        }
-
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time_taken, lljPointer->jb->id - 1, lljPointer->jb->arrival, slice);
 
+        if(lljPointer->jb->start_time == -1){
+            lljPointer->jb->start_time = time_taken;
+        }
         time_taken += slice;
+        lljPointer->jb->remaining_time -= slice;
 
         if(lljPointer->jb->remaining_time <= 0){
+            if(lljPointer->jb->end_time == -1){
+                lljPointer->jb->end_time = time_taken;
+            }
+            lljPointer->jb->remaining_time = lljPointer->jb->length;
+            lljPointer->jb->wait = time_taken - lljPointer->jb->arrival - lljPointer->jb->remaining_time; 
+
             jobs_remaining -= 1;
             temp = lljPointer->jb;
             lljPointer = llhead;
@@ -468,7 +482,35 @@ int main(int argc, char **argv) {
     } else if (strcmp(pname, "LT") == 0) {
         policy_LT(slice);
         if (analysis == 1) {
-            // TODO: perform analysis
+            printf("Begin analyzing LT:\n");
+
+            {
+                struct job* temp = head;
+                if(temp == NULL){
+                    fprintf(stderr, "Failed to copy head pointer");
+                    exit(1);
+                }
+                int i = 0;
+                double avgResponse = 0;
+                double avgTurnaround = 0;
+                double avgWait = 0;
+
+                while(temp){
+                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, temp->start_time - temp->arrival, temp->end_time - temp->arrival, temp->wait);
+
+                    avgResponse = avgResponse + (temp->start_time - temp->arrival);
+                    avgTurnaround = avgTurnaround + (temp->end_time - temp->arrival);
+                    avgWait = avgWait + (temp->wait);
+                    temp = temp->next;
+                    i++;
+                }
+
+                avgResponse = avgResponse / i;
+                avgTurnaround = avgTurnaround / i;
+                avgWait = avgWait / i;
+                printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", avgResponse, avgTurnaround, avgWait);
+            }
+            printf("End analyzing LT.\n");
         }
     } else {
         fprintf(stderr, "Unknown policy: %s\n", pname);
