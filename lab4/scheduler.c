@@ -154,7 +154,7 @@ void policy_SJF() {
     struct job *current, *shortest;
     int current_time = 0;
 
-    while (numofjobs > 0) {
+    while (numofjobs) {
         current = head;
         shortest = NULL;
 
@@ -167,10 +167,10 @@ void policy_SJF() {
         }
 
         if (shortest != NULL) {
-            if (shortest->start_time == -1) {
+            if ((shortest != NULL)&&(shortest->start_time == -1)) {
                 shortest->start_time = current_time;
             }
-            printf("[Job %d] arrived at time [%d] ran for [%d]\n", shortest->id, shortest->arrival, shortest->length);
+            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", current->start_time, current->id - 1, current->arrival, current_time - current->start_time);
             current_time += shortest->length;
             shortest->end_time = current_time;
             numofjobs--;
@@ -242,8 +242,63 @@ void policy_STCF() {
 void policy_RR(int slice) {
     printf("Execution trace with RR:\n");
 
-    // TODO: implement RR policy
+    struct job *current = head;
+    struct job *w = head;
+    int current_time = 0;
+    int c_time = 0;
+    while (numofjobs) {
+        current = head;
+        int status = 0;
+        while ((current != NULL)) {
+            if ((current->remaining_time > 0)&&(current->arrival <= current_time)) {
+                c_time = current_time;
+                if (current->start_time == -1) {
+                    current->start_time = current_time;
+                }
 
+                if (current->remaining_time > slice) {
+                    current->remaining_time -= slice;
+                    current_time += slice;
+                    status = 1;
+                } else {
+                    current_time += current->remaining_time;
+                    current->remaining_time = 0;
+                    current->end_time = current_time;
+                    numofjobs--;
+                    status = 1;
+                }
+
+                while(w){
+                    if((w->end_time == -1)&&(w != current)&&(w->arrival <= current_time)){
+                        if(w->wait == -1){
+                            w->wait = 0;
+                        }
+                        if((current_time -  w->arrival) >= slice){
+                            w->wait += (current_time - c_time);
+                        }
+                        else{
+                            w->wait += (current_time - w->arrival);
+                        }
+                        
+                    }
+                    w = w->next;
+                }
+                w = head;
+
+                printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", c_time, current->id - 1, current->arrival, current_time - c_time);
+            }
+            current = current->next;
+        }
+        if(status == 0){
+            current_time++;
+        }
+    }
+    while(w){
+        if(w->wait == -1){
+            w->wait = 0;
+        }
+        w = w->next;
+    }
     printf("End of execution with RR.\n");
 }
 
@@ -482,8 +537,35 @@ int main(int argc, char **argv) {
         }
     } else if (strcmp(pname, "RR") == 0) {
         policy_RR(slice);
-        if (analysis == 1) {
-            // TODO: perform analysis
+        if (analysis == 1){
+            printf("Begin analyzing RR:\n");
+            {
+                struct job* temp = head;
+                if(temp == NULL){
+                    fprintf(stderr, "Failed to copy head pointer");
+                    exit(1);
+                }
+                int i = 0;
+                double avgResponse = 0;
+                double avgTurnaround = 0;
+                double avgWait = 0;
+
+                while(temp){
+                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, temp->start_time - temp->arrival, temp->end_time - temp->arrival, temp->wait);
+
+                    avgResponse = avgResponse + (temp->start_time - temp->arrival);
+                    avgTurnaround = avgTurnaround + (temp->end_time - temp->arrival);
+                    avgWait = avgWait + (temp->wait);
+                    temp = temp->next;
+                    i++;
+                }
+
+                avgResponse = avgResponse / i;
+                avgTurnaround = avgTurnaround / i;
+                avgWait = avgWait / i;
+                printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", avgResponse, avgTurnaround, avgWait);
+            }
+            printf("End analyzing RR.\n");
         }
     } else if (strcmp(pname, "LT") == 0) {
         policy_LT(slice);
