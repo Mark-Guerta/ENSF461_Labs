@@ -151,45 +151,62 @@ void read_job_config(const char* filename) {
 void policy_SJF() {
     printf("Execution trace with SJF:\n");
 
-    struct job *current, *shortest;
+    struct job *current, *shortest, *w;
     int current_time = 0;
-
+    int c_time = 0;
     while (numofjobs) {
-        current = head;
+        current = w = head;
         shortest = NULL;
 
         // Find the shortest job that has arrived
-        while (current != NULL) {
-            if (current->arrival <= current_time && (shortest == NULL || current->length < shortest->length || (current->length == shortest->length && current->arrival < shortest->arrival))) {
-                shortest = current;
+        while (current) {
+            if ((current->end_time == -1)&&(current->arrival <= current_time)){
+                if(shortest == NULL){
+                    shortest = current;
+                }else if (current->remaining_time < shortest -> remaining_time){
+                    shortest = current;
+                }else if((current->remaining_time == shortest -> remaining_time)&& (current->arrival < shortest->arrival)){
+                    shortest = current;
+                }
             }
             current = current->next;
         }
 
         if (shortest != NULL) {
-            if ((shortest != NULL)&&(shortest->start_time == -1)) {
+            if ((shortest->start_time == -1)) {
                 shortest->start_time = current_time;
             }
-            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", current->start_time, current->id - 1, current->arrival, current_time - current->start_time);
-            current_time += shortest->length;
+            c_time = current_time;
+            current_time += shortest->remaining_time;
+            shortest->remaining_time = 0;
             shortest->end_time = current_time;
             numofjobs--;
-
-            // Remove the job from the list
-            if (shortest == head) {
-                head = head->next;
-            } else {
-                current = head;
-                while (current->next != shortest) {
-                    current = current->next;
+            printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", c_time, shortest->id - 1, shortest->arrival, current_time - c_time);
+            while(w){
+                if((w->end_time == -1)&&(w != current)&&(w->arrival <= current_time)){
+                    if(w->wait == -1){
+                        w->wait = 0;
+                    }
+                    if((w->arrival > c_time)){
+                        w->wait += (current_time - w->arrival);
+                    }else{
+                        w->wait += (current_time - c_time);
+                    }
+                    
                 }
-                current->next = shortest->next;
+                w = w->next;
             }
-            free(shortest);
+            w = head;
         } else {
             // No job is ready to run, increment the current time
             current_time++;
         }
+    }
+    while(w){
+        if(w->wait == -1){
+            w->wait = 0;
+        }
+        w = w->next;
     }
 
     printf("End of execution with SJF.\n");
@@ -491,8 +508,35 @@ int main(int argc, char **argv) {
         }
     } else if (strcmp(pname, "SJF") == 0) {
         policy_SJF();
-        if (analysis == 1) {
-            // TODO: perform analysis
+        if (analysis == 1){
+            printf("Begin analyzing SJF:\n");
+            {
+                struct job* temp = head;
+                if(temp == NULL){
+                    fprintf(stderr, "Failed to copy head pointer");
+                    exit(1);
+                }
+                int i = 0;
+                double avgResponse = 0;
+                double avgTurnaround = 0;
+                double avgWait = 0;
+
+                while(temp){
+                    printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", temp->id - 1, temp->start_time - temp->arrival, temp->end_time - temp->arrival, temp->wait);
+
+                    avgResponse = avgResponse + (temp->start_time - temp->arrival);
+                    avgTurnaround = avgTurnaround + (temp->end_time - temp->arrival);
+                    avgWait = avgWait + (temp->wait);
+                    temp = temp->next;
+                    i++;
+                }
+
+                avgResponse = avgResponse / i;
+                avgTurnaround = avgTurnaround / i;
+                avgWait = avgWait / i;
+                printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", avgResponse, avgTurnaround, avgWait);
+            }
+            printf("End analyzing SJF.\n");
         }
     } else if (strcmp(pname, "STCF") == 0) {
         policy_STCF();
