@@ -55,14 +55,16 @@ void* myalloc(size_t size){
             header->is_free = 0;
             header->fwd = NULL;
             header->bwd = NULL;
-            memUsage += size + sizeof(header);
+            memUsage += size + sizeof(node_t);
             num_of_chunks++;
-            ptr = _arena_start + sizeof(header);
+            ptr = _arena_start + sizeof(node_t);
         }
     }
     return ptr;
 }
 
-// void myfree(void *ptr){
-
-// }
+void myfree(void *ptr){
+    void *nptr = ((void *)ptr) - sizeof(node_t);
+    node_t *header = (node_t*) nptr;
+    header->is_free = 1;
+}
