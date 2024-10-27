@@ -4,67 +4,99 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include "myalloc.h"
-void *_arena_start = NULL;
-int size_M = 0;
-int num_of_chunks = 0;
-int memUsage = 0;
+static void *_arena_start = NULL;
+static node_t *free_mem = NULL;
+static size_t current_arena_size = 0;
+static size_t memory_size = 0;
+static size_t init_size = 0;
 int statusno;
-node_t *head = NULL;
+int returnVal;
+// #define ERR_OUT_OF_MEMORY  (-1)
+// #define ERR_BAD_ARGUMENTS  (-2)
+// #define ERR_SYSCALL_FAILED (-3)
+// #define ERR_CALL_FAILED    (-4)
+// #define ERR_UNINITIALIZED   (-5)
+
 int myinit(size_t size){
-    if ((int) size < 0){
-        size_M = ERR_BAD_ARGUMENTS;
+    if (_arena_start != NULL || size > MAX_ARENA_SIZE){
+        returnVal = ERR_OUT_OF_MEMORY;
+        statusno = ERR_OUT_OF_MEMORY;
+    }
+    else if (size < 0){
+        statusno = ERR_BAD_ARGUMENTS;
+        returnVal = ERR_UNINITIALIZED;
+    }
+    _arena_start = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (_arena_start != NULL){
+        // Page Alignment
+        int multiple = size/4096.0 > size/4096? (size/4096 + 1) : size/4096;
+        free_mem = (node_t*) _arena_start;
+        free_mem->is_free = 1;
+        free_mem->size = size;
+        free_mem->bwd = NULL;
+        free_mem->fwd = NULL;
+        statusno = 0; // Clear previous status
+        current_arena_size = (multiple)*4096;
+        init_size = size;
+        returnVal = current_arena_size;
     }
     else{
-        int multiple = size/4096.0 > size/4096? (size/4096 + 1) : size/4096;
-        size_M = (multiple)*4096;
-        _arena_start = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0 );
+        returnVal = ERR_OUT_OF_MEMORY;
+        statusno = ERR_OUT_OF_MEMORY;
     }
-    return size_M;
+    return returnVal;
 }
 
 int mydestroy(){
     if (_arena_start == NULL){
-        size_M = ERR_UNINITIALIZED;
+        returnVal = ERR_UNINITIALIZED;
+        statusno = ERR_UNINITIALIZED;
     }
     else{
-        munmap(_arena_start, size_M);
-        size_M = 0;
+        munmap(_arena_start, returnVal);
+        statusno = 0;
+        returnVal = 0;
+        current_arena_size = 0;
+        memory_size = 0;
+        init_size = 0;
         _arena_start = NULL;
+        free_mem = NULL;
     }
-    return size_M;
+    return returnVal;
 }
 
 
 void* myalloc(size_t size){
-    void *ptr = NULL;
-    if (_arena_start == NULL)
+    // New chunks are made
+    void *returnPtr = NULL;
+    if (_arena_start == NULL){
         statusno = ERR_UNINITIALIZED;
-    else if ((int) size == size_M)
-        statusno = ERR_OUT_OF_MEMORY;
-    else{
-        node_t *header = (node_t *) _arena_start;
-        if (num_of_chunks > 0){
-            if (size_M < memUsage + size){
-                statusno = ERR_OUT_OF_MEMORY;
-            }
-            // Implement adding new headers
-            num_of_chunks++;
-        }
-        else{
-            header->size = size;
-            header->is_free = 0;
-            header->fwd = NULL;
-            header->bwd = NULL;
-            memUsage += size + sizeof(node_t);
-            num_of_chunks++;
-            ptr = _arena_start + sizeof(node_t);
-        }
     }
-    return ptr;
+    else if (size < 0 || size > init_size){
+        statusno = ERR_BAD_ARGUMENTS;
+    }
+    else if (memory_size + size > init_size || size + sizeof(node_t) > init_size){
+        statusno = ERR_OUT_OF_MEMORY;
+    }
+    else{
+        node_t *newChunk = (node_t*) ((void*) free_mem + sizeof(node_t) + size);
+        memory_size += size + sizeof(node_t);
+        statusno = 0;
+        free_mem->is_free = 0;
+        free_mem->size = size;
+        free_mem->fwd = newChunk;
+        newChunk->bwd = free_mem;
+        newChunk->size = init_size - memory_size;
+        newChunk->is_free = 0;
+        newChunk->fwd = NULL;
+        returnPtr = (void*)free_mem + sizeof(node_t);
+        free_mem = newChunk;
+    }
+    return returnPtr;
 }
 
 void myfree(void *ptr){
-    void *nptr = ((void *)ptr) - sizeof(node_t);
-    node_t *header = (node_t*) nptr;
-    header->is_free = 1;
+    // No coalescing added for backward or forward headers
+    node_t *chunk = (node_t *)(ptr - sizeof(node_t)); 
+    chunk->is_free = 1;
 }
