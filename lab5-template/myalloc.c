@@ -96,7 +96,12 @@ void* myalloc(size_t size){
 }
 
 void myfree(void *ptr){
-    // No coalescing added for backward or forward headers
-    node_t *chunk = (node_t *)(ptr - sizeof(node_t)); 
-    chunk->is_free = 1;
+    if (ptr == NULL) {
+        statusno = ERR_BAD_ARGUMENTS;
+    }
+    else{
+        // No coalescing added for backward or forward headers
+        node_t *chunk = (node_t *)(ptr - sizeof(node_t)); 
+        chunk->is_free = 1;
+    }
 }
