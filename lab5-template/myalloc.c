@@ -112,10 +112,9 @@ void myfree(void *ptr){
         statusno = ERR_BAD_ARGUMENTS;
     }
     else{
-        // No coalescing added for backward or forward headers
         node_t *header = (node_t *)(ptr - sizeof(node_t)); 
         header->is_free = 1;
-
+        free_mem = header;
 
         if (header->fwd != NULL && header->fwd->is_free == 1){
             header->size += sizeof(node_t) + header->fwd->size;
