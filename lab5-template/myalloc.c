@@ -108,7 +108,25 @@ void myfree(void *ptr){
     }
     else{
         // No coalescing added for backward or forward headers
-        node_t *chunk = (node_t *)(ptr - sizeof(node_t)); 
-        chunk->is_free = 1;
+        node_t *header = (node_t *)(ptr - sizeof(node_t)); 
+        header->is_free = 1;
+
+
+        if (header->fwd != NULL && header->fwd->is_free == 1){
+            header->size += sizeof(node_t) + header->fwd->size;
+            header->fwd = header->fwd->fwd;
+            if (header->fwd != NULL){
+                header->fwd->bwd = header;
+            }
+        }
+
+        if (header->bwd != NULL && header->bwd->is_free == 1){
+            header->bwd->size += sizeof(node_t) + header->size;
+            header->bwd->fwd = header->fwd;
+            if (header->fwd != NULL){
+                header->fwd->bwd = header->bwd;
+            }
+        }
+
     }
 }
