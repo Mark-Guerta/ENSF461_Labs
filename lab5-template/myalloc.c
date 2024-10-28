@@ -86,6 +86,11 @@ void* myalloc(size_t size){
         free_mem->is_free = 0;
         free_mem->size = size;
         free_mem->fwd = NULL;
+        if (memory_size + sizeof(node_t) > init_size){
+            free_mem->size = size + init_size - memory_size;
+            return (void*)free_mem + sizeof(node_t);
+        }
+        
         if(size < unused){
             node_t *newChunk = (node_t*) ((void*) free_mem + sizeof(node_t) + size);
             free_mem->fwd = newChunk;
