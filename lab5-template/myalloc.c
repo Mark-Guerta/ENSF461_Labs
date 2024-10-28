@@ -18,17 +18,22 @@ int returnVal;
 // #define ERR_UNINITIALIZED   (-5)
 
 int myinit(size_t size){
-    if (_arena_start != NULL || size > MAX_ARENA_SIZE){
+    if (_arena_start != NULL || (int) size > MAX_ARENA_SIZE){
         returnVal = ERR_OUT_OF_MEMORY;
         statusno = ERR_OUT_OF_MEMORY;
     }
-    else if (size < 0){
+    else if ((int) size < 0){
         statusno = ERR_BAD_ARGUMENTS;
-        returnVal = ERR_UNINITIALIZED;
+        returnVal = ERR_BAD_ARGUMENTS;
     }
-    _arena_start = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-    if (_arena_start != NULL){
+    
+    else{
         // Page Alignment
+        _arena_start = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        if (_arena_start == NULL){
+            statusno = ERR_SYSCALL_FAILED;
+            returnVal = ERR_SYSCALL_FAILED;
+        }
         int multiple = size/4096.0 > size/4096? (size/4096 + 1) : size/4096;
         free_mem = (node_t*) _arena_start;
         free_mem->is_free = 1;
@@ -39,10 +44,6 @@ int myinit(size_t size){
         current_arena_size = (multiple)*4096;
         init_size = size;
         returnVal = current_arena_size;
-    }
-    else{
-        returnVal = ERR_OUT_OF_MEMORY;
-        statusno = ERR_OUT_OF_MEMORY;
     }
     return returnVal;
 }
