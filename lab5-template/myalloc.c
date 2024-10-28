@@ -79,18 +79,24 @@ void* myalloc(size_t size){
         statusno = ERR_OUT_OF_MEMORY;
     }
     else{
-        node_t *newChunk = (node_t*) ((void*) free_mem + sizeof(node_t) + size);
+        size_t unused = free_mem->size;
         memory_size += size + sizeof(node_t);
         statusno = 0;
         free_mem->is_free = 0;
         free_mem->size = size;
-        free_mem->fwd = newChunk;
-        newChunk->bwd = free_mem;
-        newChunk->size = init_size - memory_size;
-        newChunk->is_free = 0;
-        newChunk->fwd = NULL;
-        returnPtr = (void*)free_mem + sizeof(node_t);
-        free_mem = newChunk;
+        free_mem->fwd = NULL;
+        if(size < unused){
+            node_t *newChunk = (node_t*) ((void*) free_mem + sizeof(node_t) + size);
+            free_mem->fwd = newChunk;
+            newChunk->bwd = free_mem; 
+            newChunk->size = init_size - memory_size - sizeof(node_t);
+            newChunk->is_free = 1;
+            newChunk->fwd = NULL;
+            returnPtr = (void*)free_mem + sizeof(node_t);
+            free_mem = newChunk;
+            return returnPtr;
+        }
+        return (void*)free_mem + sizeof(node_t);
     }
     return returnPtr;
 }
