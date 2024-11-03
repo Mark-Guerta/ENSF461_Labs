@@ -102,14 +102,13 @@ void lru(int VPN, int PFN){
 }
 
 int lookup_pageTable(int VPN){
-    for(int i = 0; i<PAGENUM; i++){
-        if(processes[current_process].pageTable[i].VPN == VPN){
-            return processes[current_process].pageTable[i].PFN;
-        }
+    if((VPN>PAGENUM)||(processes[current_process].pageTable[VPN].valid == FALSE)){
+        fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", current_process, VPN);
+        fflush(output_file);
+        exit(EXIT_FAILURE);
+
     }
-    fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", current_process, VPN);
-    fflush(output_file);
-    exit(EXIT_FAILURE);
+    return processes[current_process].pageTable[VPN].PFN;  
 }
 
 void log_TLB(int m_VPN, int m_PFN){
@@ -171,7 +170,7 @@ void init_process(int pid, int VPN) {
     for(int j = 0; j<MAX_PROCESSES; j++){
         processes[j].pageTable = (PageTable_entry*)malloc(PAGENUM * sizeof(PageTable_entry));
         for (int i = 0; i < PAGENUM; i++) {
-            processes[j].pageTable[i].VPN = 0;
+            processes[j].pageTable[i].VPN = i;
             processes[j].pageTable[i].PFN = 0;  // Invalid PFN
             processes[j].pageTable[i].valid = FALSE;
         }
@@ -199,30 +198,11 @@ void handle_ctxswitch(int pid) {
 }
 
 void handle_map(int m_VPN, int m_PFN){
-
-    for(int i = 0; i<PAGENUM; i++){
-        if (processes[current_process].pageTable[i].VPN == m_VPN){
-            processes[current_process].pageTable[i].valid = TRUE;
-            processes[current_process].pageTable[i].PFN = m_PFN;
-            log_TLB( m_VPN, m_PFN);
-            fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", current_process, m_VPN, m_PFN);
-            fflush(output_file);
-            return;
-        }
-    }
-    for(int i = 0; i<PAGENUM; i++){
-        if (processes[current_process].pageTable[i].valid == FALSE){
-            processes[current_process].pageTable[i].valid = TRUE;
-            processes[current_process].pageTable[i].VPN = m_VPN;
-            processes[current_process].pageTable[i].PFN = m_PFN;
-            log_TLB( m_VPN, m_PFN);
-            fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", current_process, m_VPN, m_PFN);
-            fflush(output_file);
-            return;
-        }
-    }
-
-   
+    processes[current_process].pageTable[m_VPN].valid = TRUE;
+    processes[current_process].pageTable[m_VPN].PFN = m_PFN;
+    log_TLB( m_VPN, m_PFN);
+    fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", current_process, m_VPN, m_PFN);
+    fflush(output_file);
     return;
 }
 
@@ -237,45 +217,37 @@ void remove_LTB(int VPN){
             TLB[i].process = -1;
         }
     }
+    return;
 }
 
 
 void handle_unmap(int m_VPN){
-    for(int i = 0; i<PAGENUM;i++){
-        if(processes[current_process].pageTable[i].VPN == m_VPN){
-            processes[current_process].pageTable[i].PFN = 0;
-            processes[current_process].pageTable[i].valid = FALSE;
-            fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", current_process, m_VPN);
-            fflush(output_file);
-        }
-    }
-    
 
+    processes[current_process].pageTable[m_VPN].PFN = 0;
+    processes[current_process].pageTable[m_VPN].valid = FALSE;
+    fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", current_process, m_VPN);
+    fflush(output_file);
     remove_LTB(m_VPN);
     return;
 }
 
-void handle_pinspect(int m_VPN){
-    int pfn = 0;
-    int vpn = 0;
-    int valid = 0;
-    for(int i = 0; i<PAGENUM; i++){
-        if(processes[current_process].pageTable[i].VPN == m_VPN){
-            pfn = processes[current_process].pageTable[i].PFN ; 
-            vpn = processes[current_process].pageTable[i].VPN ;
-            valid = processes[current_process].pageTable[i].valid ;
-            break;
-        }
-    }
-    
-    fprintf(output_file, "Current PID: %d. Inspected page table entry %d. Physical frame number: %d. Valid: %d\n", current_process, vpn, pfn, valid);
+void handle_pinspect(int m_VPN){  
+    fprintf(output_file, "Current PID: %d. Inspected page table entry %d. Physical frame number: %d. Valid: %d\n", current_process, processes[current_process].pageTable[m_VPN].VPN, processes[current_process].pageTable[m_VPN].PFN, processes[current_process].pageTable[m_VPN].valid);
     fflush(output_file);
-  
+    return;
 }
 
 void handle_tinspect(int m_TLB){
-    fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %d\n", current_process, m_TLB, TLB[m_TLB].VPN, TLB[m_TLB].PFN, TLB[m_TLB].valid, TLB[m_TLB].process, TLB[m_TLB].time_stamp );
-    fflush(output_file);
+    if(strcmp("FIFO",strategy) == 0){
+        fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %d\n", current_process, m_TLB, TLB[m_TLB].VPN, TLB[m_TLB].PFN, TLB[m_TLB].valid, TLB[m_TLB].process, TLB[m_TLB].time_stamp);
+        fflush(output_file);
+    }else if(strcmp("LRU",strategy) == 0){
+        fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %d\n", current_process, m_TLB, TLB[m_TLB].VPN, TLB[m_TLB].PFN, TLB[m_TLB].valid, TLB[m_TLB].process, TLB[m_TLB].used);
+        fflush(output_file);
+    }
+    
+    
+    return;
 }
 
 int load_from_memory(uint32_t physical_address) {
@@ -284,6 +256,7 @@ int load_from_memory(uint32_t physical_address) {
 
 void store_to_memory(uint32_t physical_address, int immediate_value){
     physicalMemory[physical_address] = immediate_value;
+    return;
 }
 
 int main(int argc, char* argv[]) {
@@ -305,12 +278,12 @@ int main(int argc, char* argv[]) {
     FILE* input_file = fopen(input_trace, "r");
     output_file = fopen(output_trace, "w");  
     
-
-    
     int defineCall = 0;
     while ( !feof(input_file) ) {
-        // Read input file line by line
+        // Increment time at the beginning of each iteration
+        time++;
         
+        // Read input file line by line
         char *rez = fgets(buffer, sizeof(buffer), input_file);
         if ( !rez ) {
             fprintf(stderr, "Reached end of trace. Exiting...\n");
@@ -322,10 +295,9 @@ int main(int argc, char* argv[]) {
         char** tokens = tokenize_input(buffer);
 
         // TODO: Implement your memory simulator
-        
-        time++;
 
         if (strcmp(tokens[0], "%") == 0) {
+            time--;
            continue;
         }else if(strcmp(tokens[0], "define") == 0) {
             if(defineCall == 1){
@@ -339,7 +311,7 @@ int main(int argc, char* argv[]) {
             handle_Define(OFF, PFN, VPN);
             defineCall = 1;
             OFFSET = OFF;
-            fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", current_process,OFF, PFN, VPN);
+            fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", current_process, OFF, PFN, VPN);
             fflush(output_file);
         }
         else if (strcmp(tokens[0], "ctxswitch") == 0) {
@@ -365,6 +337,10 @@ int main(int argc, char* argv[]) {
         }else if (strcmp(tokens[0], "tinspect") == 0) {
             int m_TLB = atoi(tokens[1]);
             handle_tinspect(m_TLB);
+        }else if (strcmp(tokens[0], "linspect") == 0) {
+            uint32_t loc = atoi(tokens[1]);
+            uint32_t value = load_from_memory(loc);
+            fprintf(output_file, "Current PID: %d. Inspected physical location %d. Value: %d\n", current_process, loc, value);
         }else if (strcmp(tokens[0], "rinspect") == 0) {
             if(strcmp("r1", tokens[1]) == 0){
                 fprintf(output_file, "Current PID: %d. Inspected register r1. Content: %d\n", current_process, processes[current_process].R1);
