@@ -10,6 +10,7 @@
 #define TLB_NUM 8
 #define PAGENUM 256
 
+int OFFSET;
 // Output file
 FILE* output_file;
 
@@ -35,12 +36,8 @@ typedef struct {
 typedef struct {
     PageTable_entry* pageTable;
     uint32_t* physicalMemory;
-    int PFN;
-    int VPN;
-    int OFF; 
     uint32_t R1;
     uint32_t R2;
-
 } Process;
 
 Process processes[MAX_PROCESSES];
@@ -334,9 +331,7 @@ int main(int argc, char* argv[]) {
             int VPN = atoi(tokens[3]);
             handle_Define(OFF, PFN, VPN);
             defineCall = 1;
-            processes[current_process].VPN = VPN;
-            processes[current_process].OFF = OFF;
-            processes[current_process].PFN = PFN;
+            OFFSET = OFF;
             fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", current_process,OFF, PFN, VPN);
             fflush(output_file);
         }
@@ -394,8 +389,8 @@ int main(int argc, char* argv[]) {
             } else {
                 // Memory load
                 int virtual_address = atoi(tokens[2]);
-                int offset = virtual_address & ((1 << processes[current_process].OFF) - 1); // Extract offset bits
-                int VPN = virtual_address >> processes[current_process].OFF; // Extract VPN
+                int offset = virtual_address & ((1 << OFFSET) - 1); // Extract offset bits
+                int VPN = virtual_address >> OFFSET; // Extract VPN
 
                 // Find the PFN for the given VPN
                 int PFN = lookup_TLB(VPN);
@@ -406,7 +401,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // Calculate the physical address
-                int physical_address = (PFN << processes[current_process].OFF) | offset;
+                int physical_address = (PFN << OFFSET) | offset;
 
                 // Perform the memory load
                 uint32_t value = load_from_memory(physical_address);
@@ -426,8 +421,8 @@ int main(int argc, char* argv[]) {
             }
         }else if (strcmp(tokens[0], "store") == 0) {
             int virtual_address = atoi(tokens[1]);
-            int offset = virtual_address & ((1 << processes[current_process].OFF) - 1); // Extract offset bits
-            int VPN = virtual_address >> processes[current_process].OFF; // Extract VPN
+            int offset = virtual_address & ((1 << OFFSET) - 1); // Extract offset bits
+            int VPN = virtual_address >> OFFSET; // Extract VPN
         
             // Find the PFN for the given VPN
             int PFN = lookup_TLB(VPN);
@@ -438,7 +433,7 @@ int main(int argc, char* argv[]) {
             }
         
             // Calculate the physical address
-            int physical_address = (PFN << processes[current_process].OFF) | offset;
+            int physical_address = (PFN << OFFSET) | offset;
         
             if (tokens[2][0] == '#') {
                 // Immediate value
