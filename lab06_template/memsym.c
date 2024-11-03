@@ -35,11 +35,11 @@ typedef struct {
 
 typedef struct {
     PageTable_entry* pageTable;
-    uint32_t* physicalMemory;
     uint32_t R1;
     uint32_t R2;
 } Process;
 
+uint32_t* physicalMemory;
 Process processes[MAX_PROCESSES];
 int current_process = 0;
 
@@ -73,31 +73,32 @@ void fifo(int VPN, int PFN){
     int lowest = 0;
     for(int i = 1; i<TLB_size; i++){
         if(TLB[i].time_stamp < TLB[lowest].time_stamp){
-            TLB[i].VPN = VPN;
-            TLB[i].PFN = PFN;
-            TLB[i].valid = TRUE;
-            TLB[i].process = current_process;
-            TLB[i].time_stamp = time;
-            TLB[i].used = time;
-            return;
+            lowest = i;
         }
     }
+    TLB[lowest].VPN = VPN;
+    TLB[lowest].PFN = PFN;
+    TLB[lowest].valid = TRUE;
+    TLB[lowest].process = current_process;
+    TLB[lowest].time_stamp = time;
+    TLB[lowest].used = time;
+    return;
 }
 
 void lru(int VPN, int PFN){
     int lowest = 0;
     for(int i = 1; i<TLB_size; i++){
         if(TLB[i].used < TLB[lowest].used){
-            TLB[i].VPN = VPN;
-            TLB[i].PFN = PFN;
-            TLB[i].valid = TRUE;
-            TLB[i].process = current_process;
-            TLB[i].time_stamp = time;
-            TLB[i].used = time;
-            return;
+            lowest = i;
         }
     }
-
+    TLB[lowest].VPN = VPN;
+    TLB[lowest].PFN = PFN;
+    TLB[lowest].valid = TRUE;
+    TLB[lowest].process = current_process;
+    TLB[lowest].time_stamp = time;
+    TLB[lowest].used = time;
+    return;
 }
 
 int lookup_pageTable(int VPN){
@@ -106,8 +107,9 @@ int lookup_pageTable(int VPN){
             return processes[current_process].pageTable[i].PFN;
         }
     }
-
-    return -1;
+    fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", current_process, VPN);
+    fflush(output_file);
+    exit(EXIT_FAILURE);
 }
 
 void log_TLB(int m_VPN, int m_PFN){
@@ -117,6 +119,7 @@ void log_TLB(int m_VPN, int m_PFN){
             TLB[i].valid = TRUE;
             TLB[i].time_stamp = time;
             TLB[i].used = time;
+            TLB[i].process = current_process;
             return;
         }
     }
@@ -155,15 +158,10 @@ int lookup_TLB(int VPN){
     }
     
     // TLB MISS
-    fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d missed in TLB\n", current_process, VPN);
+    fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d caused a TLB miss\n", current_process, VPN);
     fflush(output_file);
 
     int PFN = lookup_pageTable(VPN);
-    if (PFN == -1) {
-        fprintf(output_file, "Current PID: %d. Error: VPN %d not found in page table\n", current_process, VPN);
-        fflush(output_file);
-        return -1;
-    }
 
     log_TLB(VPN, PFN);
     return PFN;
@@ -185,11 +183,7 @@ void init_process(int pid, int VPN) {
 
 void handle_Define(int OFF, int PFN, int VPN) {
     int length = 1 << (OFF + PFN);
-    for(int i = 0; i < MAX_PROCESSES; i++){
-        if (processes[i].physicalMemory == NULL) {
-            processes[i].physicalMemory = (uint32_t*)calloc(length, sizeof(uint32_t));
-        }
-    }
+   physicalMemory = (uint32_t*)calloc(length, sizeof(uint32_t));
     
     init_process(current_process, VPN);
 }
@@ -235,23 +229,29 @@ void handle_map(int m_VPN, int m_PFN){
 
 void remove_LTB(int VPN){
     for(int i = 0; i<TLB_NUM; i++){
-        if(TLB[i].VPN == VPN){
+        if((TLB[i].VPN == VPN)&&(TLB[i].process == current_process)){
             TLB[i].VPN = -1;
             TLB[i].PFN = -1;
             TLB[i].time_stamp = -1;
             TLB[i].used = -1;
             TLB[i].valid = FALSE;
+            TLB[i].process = -1;
         }
     }
 }
 
 
 void handle_unmap(int m_VPN){
-    processes[current_process].pageTable[m_VPN].VPN = -1;
-    processes[current_process].pageTable[m_VPN].PFN = -1;
-    processes[current_process].pageTable[m_VPN].valid = FALSE;
-    fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", current_process, m_VPN);
-    fflush(output_file);
+    for(int i = 0; i<PAGENUM;i++){
+        if(processes[current_process].pageTable[i].VPN == m_VPN){
+            processes[current_process].pageTable[i].VPN = -1;
+            processes[current_process].pageTable[i].PFN = -1;
+            processes[current_process].pageTable[i].valid = FALSE;
+            fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", current_process, m_VPN);
+            fflush(output_file);
+        }
+    }
+    
 
     remove_LTB(m_VPN);
     return;
@@ -272,11 +272,11 @@ void handle_tinspect(int m_TLB){
 }
 
 int load_from_memory(uint32_t physical_address) {
-    return processes[current_process].physicalMemory[physical_address];
+    return physicalMemory[physical_address];
 }
 
 void store_to_memory(uint32_t physical_address, int immediate_value){
-    processes[current_process].physicalMemory[physical_address] = immediate_value;
+    physicalMemory[physical_address] = immediate_value;
 }
 
 int main(int argc, char* argv[]) {
@@ -426,11 +426,6 @@ int main(int argc, char* argv[]) {
         
             // Find the PFN for the given VPN
             int PFN = lookup_TLB(VPN);
-            if (PFN == -1) {
-                fprintf(output_file, "Current PID: %d. Error: invalid virtual address %d\n", current_process, virtual_address);
-                fflush(output_file);
-                continue;
-            }
         
             // Calculate the physical address
             int physical_address = (PFN << OFFSET) | offset;
@@ -472,10 +467,10 @@ int main(int argc, char* argv[]) {
             free(tokens[i]);
         free(tokens);
     }
+    if (physicalMemory) {
+        free(physicalMemory);
+    }
     for (int i = 0; i < MAX_PROCESSES; i++) {
-        if (processes[i].physicalMemory) {
-            free(processes[i].physicalMemory);
-        }
         if (processes[i].pageTable) {
             free(processes[i].pageTable);
         }
