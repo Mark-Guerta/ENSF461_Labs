@@ -28,8 +28,8 @@ typedef struct {
 } TLB_entry;
 
 typedef struct {
-    uint32_t VPN;  // Virtual Page Number
-    uint32_t PFN;  // Physical Frame Number
+    int VPN;  // Virtual Page Number
+    int PFN;  // Physical Frame Number
     int valid;     // Valid bit
 } PageTable_entry;
 
@@ -169,11 +169,10 @@ int lookup_TLB(int VPN){
 
 void init_process(int pid, int VPN) {
     for(int j = 0; j<MAX_PROCESSES; j++){
-        int pageTable_size = PAGENUM;
-        processes[j].pageTable = (PageTable_entry*)malloc(pageTable_size * sizeof(PageTable_entry));
-        for (int i = 0; i < pageTable_size; i++) {
-            processes[j].pageTable[i].VPN = -1;
-            processes[j].pageTable[i].PFN = -1;  // Invalid PFN
+        processes[j].pageTable = (PageTable_entry*)malloc(PAGENUM * sizeof(PageTable_entry));
+        for (int i = 0; i < PAGENUM; i++) {
+            processes[j].pageTable[i].VPN = 0;
+            processes[j].pageTable[i].PFN = 0;  // Invalid PFN
             processes[j].pageTable[i].valid = FALSE;
         }
     }
@@ -230,8 +229,8 @@ void handle_map(int m_VPN, int m_PFN){
 void remove_LTB(int VPN){
     for(int i = 0; i<TLB_NUM; i++){
         if((TLB[i].VPN == VPN)&&(TLB[i].process == current_process)){
-            TLB[i].VPN = -1;
-            TLB[i].PFN = -1;
+            TLB[i].VPN = 0;
+            TLB[i].PFN = 0;
             TLB[i].time_stamp = -1;
             TLB[i].used = -1;
             TLB[i].valid = FALSE;
@@ -244,8 +243,7 @@ void remove_LTB(int VPN){
 void handle_unmap(int m_VPN){
     for(int i = 0; i<PAGENUM;i++){
         if(processes[current_process].pageTable[i].VPN == m_VPN){
-            processes[current_process].pageTable[i].VPN = -1;
-            processes[current_process].pageTable[i].PFN = -1;
+            processes[current_process].pageTable[i].PFN = 0;
             processes[current_process].pageTable[i].valid = FALSE;
             fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", current_process, m_VPN);
             fflush(output_file);
@@ -258,9 +256,18 @@ void handle_unmap(int m_VPN){
 }
 
 void handle_pinspect(int m_VPN){
-    int pfn = processes[current_process].pageTable[m_VPN].PFN; 
-    int vpn = processes[current_process].pageTable[m_VPN].VPN;
-    int valid = processes[current_process].pageTable[m_VPN].valid;
+    int pfn = 0;
+    int vpn = 0;
+    int valid = 0;
+    for(int i = 0; i<PAGENUM; i++){
+        if(processes[current_process].pageTable[i].VPN == m_VPN){
+            pfn = processes[current_process].pageTable[i].PFN ; 
+            vpn = processes[current_process].pageTable[i].VPN ;
+            valid = processes[current_process].pageTable[i].valid ;
+            break;
+        }
+    }
+    
     fprintf(output_file, "Current PID: %d. Inspected page table entry %d. Physical frame number: %d. Valid: %d\n", current_process, vpn, pfn, valid);
     fflush(output_file);
   
