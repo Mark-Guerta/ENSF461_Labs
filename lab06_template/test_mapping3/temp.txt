@@ -5,3 +5,20 @@ Current PID: 0. Loaded immediate 24 into register r1
 Current PID: 0. Translating. Lookup for VPN 1 hit in TLB entry 0. PFN is 1
 Current PID: 0. Stored value of register r1 (24) into location 32
 Current PID: 1. Switched execution context to process: 1
+Current PID: 1. Mapped virtual page number 1 to physical frame number 3
+Current PID: 1. Loaded immediate 15 into register r2
+Current PID: 1. Translating. Lookup for VPN 33 missed in TLB
+Current PID: 1. Error: VPN 33 not found in page table
+Current PID: 1. Error: invalid virtual address 33
+Current PID: 0. Switched execution context to process: 0
+Current PID: 0. Translating. Lookup for VPN 1 hit in TLB entry 0. PFN is 1
+Current PID: 0. Loaded value of location 32 (24) into register r2
+Current PID: 1. Switched execution context to process: 1
+Current PID: 1. Translating. Lookup for VPN 33 missed in TLB
+Current PID: 1. Error: VPN 33 not found in page table
+Current PID: 1. Error: invalid virtual address 33
+Current PID: 2. Switched execution context to process: 2
+Current PID: 2. Mapped virtual page number 2 to physical frame number 0
+Current PID: 2. Translating. Lookup for VPN 64 missed in TLB
+Current PID: 2. Error: VPN 64 not found in page table
+Current PID: 2. Error: invalid virtual address 64

@@ -173,20 +173,25 @@ int lookup_TLB(int VPN){
 }
 
 void init_process(int pid, int VPN) {
-    int pageTable_size = PAGENUM;
-    processes[pid].pageTable = (PageTable_entry*)malloc(pageTable_size * sizeof(PageTable_entry));
-    for (int i = 0; i < pageTable_size; i++) {
-        processes[pid].pageTable[i].VPN = -1;
-        processes[pid].pageTable[i].PFN = -1;  // Invalid PFN
-        processes[pid].pageTable[i].valid = FALSE;
+    for(int j = 0; j<MAX_PROCESSES; j++){
+        int pageTable_size = PAGENUM;
+        processes[j].pageTable = (PageTable_entry*)malloc(pageTable_size * sizeof(PageTable_entry));
+        for (int i = 0; i < pageTable_size; i++) {
+            processes[j].pageTable[i].VPN = -1;
+            processes[j].pageTable[i].PFN = -1;  // Invalid PFN
+            processes[j].pageTable[i].valid = FALSE;
+        }
     }
+    
 
 }
 
 void handle_Define(int OFF, int PFN, int VPN) {
     int length = 1 << (OFF + PFN);
     for(int i = 0; i < MAX_PROCESSES; i++){
-        processes[current_process].physicalMemory = (uint32_t*)calloc(length, sizeof(uint32_t));
+        if (processes[i].physicalMemory == NULL) {
+            processes[i].physicalMemory = (uint32_t*)calloc(length, sizeof(uint32_t));
+        }
     }
     
     init_process(current_process, VPN);
