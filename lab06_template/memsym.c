@@ -8,8 +8,8 @@
 #define FALSE 0
 #define MAX_PROCESSES 4
 #define TLB_NUM 8
-#define PAGENUM 256
 
+int PAGENUM;
 int OFFSET;
 // Output file
 FILE* output_file;
@@ -167,6 +167,7 @@ int lookup_TLB(int VPN){
 }
 
 void init_process(int pid, int VPN) {
+    PAGENUM = 1<<VPN;
     for(int j = 0; j<MAX_PROCESSES; j++){
         processes[j].pageTable = (PageTable_entry*)malloc(PAGENUM * sizeof(PageTable_entry));
         for (int i = 0; i < PAGENUM; i++) {
