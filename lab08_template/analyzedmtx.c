@@ -72,7 +72,24 @@ int generate_file_list(char* path) {
         return FALSE;
     }
 
+    filedata* filelist = (filedata*)sharedmem;
+
     //Copy over the files into the sharedmem array
+    dir = opendir(path);
+    if(dir == NULL){
+        perror ("");
+        return FALSE;
+    }
+    int i = 0;
+    while((ent = readdir(dir)) != NULL){
+        if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0) { 
+            strcpy(filelist[i].filename, ent->d_name); 
+            i++; 
+        }
+    }
+    closedir(dir);
+    char* done = "FinishedFileList";
+    perror(done);
 
     return TRUE;
 }
@@ -140,9 +157,26 @@ char* scandmtx(char* filepath) {
         return NULL;
     }
 
-    //Look at dmtxread.c to implement the rest of the dmtx decoding process
-    
+    dmtxImageSetProp(img, DmtxPropImageFlip, DmtxFlipNone);
+
+    dec = dmtxDecodeCreate(img, 1);
+    if(dec == NULL){
+        DestroyMagickWand(wand);
+        return NULL;
+    }
+
+    reg = dmtxRegionFindNext(dec, NULL);
+    msg = dmtxDecodeMatrixRegion(dec, reg, DmtxUndefined);
+    if(msg != NULL){
+        result = (char*)malloc(msg->outputSize);
+        result = strcpy(result, msg->output);
+        dmtxMessageDestroy(&msg);
+    }
+
+    dmtxRegionDestroy(&reg);
+    dmtxDecodeDestroy(&dec);
     dmtxImageDestroy(&img);
+    free(pxl);
     DestroyMagickWand(wand);
 
     return result;
@@ -151,9 +185,21 @@ char* scandmtx(char* filepath) {
 //Code for your Sequential Implementation 
 void generate_dmtx_seq() {
     filedata* filelist = (filedata*)sharedmem;
+    char* prefix = "dmtx/";
+    /*
+    char err[256];
+    sprintf(err, "numfiles %d", numfiles);
+    perror(err);
+    */
 
     for ( int i = 0; i < numfiles; i++) {
         // Get and save the message from each of the files in the dtmx folder 
+        size_t length = strlen(prefix) + strlen(filelist[i].filename) + 1;
+        char* str = (char*)malloc(length);
+        strcpy(str, prefix);
+        strcat(str, filelist[i].filename);
+        strcpy(filelist[i].message, scandmtx(str));
+        free(str);
     } 
 
     closedmtx();
@@ -178,26 +224,30 @@ int main(int argc, char** argv) {
 
     // Build list of DMTX files in the directory
     // Note, any PNG file will be considered a DMTX code
- 
+    
     int result = generate_file_list(argv[2]);
     if ( result == FALSE )
         return -1;
     
-    if ( numprocesses == 0 )
+    if( numprocesses == 0 ){
         generate_dmtx_seq();
-
+    }
+    else{
+        ;
+    }
+    
     // Write the results to the output file
     FILE* fp = fopen(argv[3], "w");
     if (fp == NULL) {
         perror("fopen");
         return -1;
     }
+
     filedata* filelist = (filedata*)sharedmem;
     for ( int i = 0; i < numfiles; i++ ) {
         fprintf(fp, "%s", filelist[i].message);
     }
     fclose(fp);
-
     munmap(sharedmem, sizeof(filedata) * numfiles);
     shm_unlink("filelist");
     
