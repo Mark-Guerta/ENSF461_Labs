@@ -33,6 +33,10 @@ char* sharedmem;
 
 // Number of files in the directory
 int numfiles = 0;
+int nextFile = 0;
+
+//File Prefix
+char* prefix;
 
 // Generate a list of files in the directory
 // Must create a shared memory object in the "sharedfd" global variable
@@ -88,8 +92,9 @@ int generate_file_list(char* path) {
         }
     }
     closedir(dir);
-    char* done = "FinishedFileList";
-    perror(done);
+
+    prefix = (char*)malloc(strlen(path)+1);
+    strcpy(prefix, path);
 
     return TRUE;
 }
@@ -185,7 +190,6 @@ char* scandmtx(char* filepath) {
 //Code for your Sequential Implementation 
 void generate_dmtx_seq() {
     filedata* filelist = (filedata*)sharedmem;
-    char* prefix = "dmtx/";
     /*
     char err[256];
     sprintf(err, "numfiles %d", numfiles);
@@ -194,8 +198,7 @@ void generate_dmtx_seq() {
 
     for ( int i = 0; i < numfiles; i++) {
         // Get and save the message from each of the files in the dtmx folder 
-        size_t length = strlen(prefix) + strlen(filelist[i].filename) + 1;
-        char* str = (char*)malloc(length);
+        char* str = (char*)malloc(strlen(prefix)+1);
         strcpy(str, prefix);
         strcat(str, filelist[i].filename);
         strcpy(filelist[i].message, scandmtx(str));
@@ -206,10 +209,47 @@ void generate_dmtx_seq() {
 }
 
 //Code for your Parallel Implementation
-void generate_dmtx_par() {
+void generate_dmtx_par(int numprocess) {
     filedata* filelist = (filedata*)sharedmem;
+    int filesPerProcess = numfiles / numprocess;
+    sem_t* sem = sem_open("/filelist_sem", O_CREAT, 0666, numprocess);
+    if(sem == SEM_FAILED){ 
+        perror("sem_open"); 
+        return; 
+    }
 
-    //Implement your parallel code solution here!
+    for(int i = 0; i < numprocess; i++){
+        pid_t pid = fork();
+        if(pid == 0){ //Child Process
+            int tempsharedfd = shm_open("filelist", O_CREAT | O_RDWR, 0666);
+            if (tempsharedfd < 0) {
+                perror("shm_open");
+                return;
+            }
+            char* tempsharedmem = mmap(NULL, sizeof(filedata) * numfiles, PROT_READ | PROT_WRITE, MAP_SHARED, tempsharedfd, 0);
+            if (tempsharedmem == MAP_FAILED) {
+                perror("mmap");
+                return;
+            }
+            for(int j = 0; j < filesPerProcess; j++){
+                char* str = (char*)malloc(strlen(prefix)+1);
+                strcpy(str, prefix);
+                sem_wait(sem);
+                strcat(str, filelist[nextFile].filename);
+                strcpy(filelist[nextFile].message, scandmtx(str));
+                free(str);
+                sem_post(sem);
+                nextFile++;
+            }
+        }
+        else{
+            int status;
+            waitpid(pid, &status, 0);
+        }
+    }
+    sem_close(sem); 
+    sem_unlink("/filelist_sem");
+    nextFile = 0;
 
     closedmtx();
 }
@@ -233,7 +273,7 @@ int main(int argc, char** argv) {
         generate_dmtx_seq();
     }
     else{
-        ;
+        generate_dmtx_par(numprocesses);
     }
     
     // Write the results to the output file
@@ -250,6 +290,5 @@ int main(int argc, char** argv) {
     fclose(fp);
     munmap(sharedmem, sizeof(filedata) * numfiles);
     shm_unlink("filelist");
-    
     return 0;
 }
